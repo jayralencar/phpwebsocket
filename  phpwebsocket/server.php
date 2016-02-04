@@ -32,26 +32,22 @@ while(true){
 }
 
 //---------------------------------------------------------------
-function process($user,$msg){
+function process($user_sent,$msg){
+  global $sockets,$users;
   $ms = unwrap($msg);
   $obj = json_decode($ms);
   $action = $obj->msg;
   say("< ".$action);
-  switch($action){
-    case "hello" : send($user->socket,"hello human");                       break;
-    case "hi"    : send($user->socket,"zup human");                         break;
-    case "name"  : send($user->socket,"my name is Multivac, silly I know"); break;
-    case "age"   : send($user->socket,"I am older than time itself");       break;
-    case "date"  : send($user->socket,"today is ".date("Y.m.d"));           break;
-    case "time"  : send($user->socket,"server time is ".date("H:i:s"));     break;
-    case "thanks": send($user->socket,"you're welcome");                    break;
-    case "bye"   : send($user->socket,"bye");                               break;
-    default      : send($user->socket,$action." not understood");           break;
+  foreach ($users as &$user) {
+    if($user != $user_sent){
+      send($user->socket,$action);  
+    }
+    
   }
 }
 
 function send($client,$msg){
-  say("> ".$msg);
+  // say("> ".$msg);
   $msg = wrap($msg);
   $sent = socket_write($client, $msg);
 }
@@ -97,11 +93,11 @@ function dohandshake($user,$buffer){
   list($resource,$host,$origin,$key) = getheaders($buffer);
   console("Handshaking...");
 
-$upgrade  = "HTTP/1.1 101 Web Socket Protocol Handshake\r\n" .
-            "Upgrade: WebSocket\r\n" .
-            "Connection: Upgrade\r\n" .
-            "Sec-WebSocket-Accept: ".base64_encode(sha1($key."258EAFA5-E914-47DA-95CA-C5AB0DC85B11",true))."\r\n".
-            "\r\n";
+  $upgrade  = "HTTP/1.1 101 Web Socket Protocol Handshake\r\n" .
+  "Upgrade: WebSocket\r\n" .
+  "Connection: Upgrade\r\n" .
+  "Sec-WebSocket-Accept: ".base64_encode(sha1($key."258EAFA5-E914-47DA-95CA-C5AB0DC85B11",true))."\r\n".
+  "\r\n";
   socket_write($user->socket,$upgrade);
 
   $user->handshake=true;
@@ -131,14 +127,14 @@ function getuserbysocket($socket){
 
 function     say($msg=""){ echo $msg."\n"; }
 function    wrap($msg=""){
-$length=strlen($msg);
-$header=chr(0x81).chr($length);
-$msg=$header.$msg;
-return $msg;
+  $length=strlen($msg);
+  $header=chr(0x81).chr($length);
+  $msg=$header.$msg;
+  return $msg;
 }
 function  unwrap($msg=""){
-{
-$firstMask=     bindec("10000000");
+  {
+    $firstMask=     bindec("10000000");
 $secondMask=    bindec("01000000");//im not doing anything with the rsvs since we arent negotiating extensions...
 $thirdMask=     bindec("00100000");
 $fourthMask=    bindec("00010000");
@@ -156,35 +152,35 @@ $length=$secondHeader & (~$firstMask);
 $index=2;
 if($length==126)
 {
-$length=ord($msg[$index])+ord($msg[$index+1]);
-$index+=2;
+  $length=ord($msg[$index])+ord($msg[$index+1]);
+  $index+=2;
 }
 if($length==127)
 {
-$length=ord($msg[$index])+ord($msg[$index+1])+ord($msg[$index+2])+ord($msg[$index+3])+ord($msg[$index+4])+ord($msg[$index+5])+ord($msg[$index+6])+ord($msg[$index+7]);
-$index+=8;
+  $length=ord($msg[$index])+ord($msg[$index+1])+ord($msg[$index+2])+ord($msg[$index+3])+ord($msg[$index+4])+ord($msg[$index+5])+ord($msg[$index+6])+ord($msg[$index+7]);
+  $index+=8;
 }
 if($masked)
 {
-for($x=0;$x<4;$x++)
-{
-$key[$x]=ord($msg[$index]);
-$index++;
-}
+  for($x=0;$x<4;$x++)
+  {
+    $key[$x]=ord($msg[$index]);
+    $index++;
+  }
 }
 echo $length."\n";
 for($x=0;$x<$length;$x++)
 {
-$msgnum=ord($msg[$index]);
-$keynum=$key[$x % 4];
-$unmaskedKeynum=$msgnum ^ $keynum;
-$payload.=chr($unmaskedKeynum);
-$index++;
+  $msgnum=ord($msg[$index]);
+  $keynum=$key[$x % 4];
+  $unmaskedKeynum=$msgnum ^ $keynum;
+  $payload.=chr($unmaskedKeynum);
+  $index++;
 }
 
 if($fin!=1)
 {
-return $payload.processMsg(substr($msg,$index));
+  return $payload.processMsg(substr($msg,$index));
 }
 return $payload;
 }
